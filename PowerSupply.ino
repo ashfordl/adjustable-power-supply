@@ -25,6 +25,8 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 // Rotary encoder pins
 #define VSETA A0
 #define VSETB A1
+#define ISETA A2
+#define ISETB A3
 
 // LED pins
 #define SHUTDOWN_LED 3
@@ -35,12 +37,16 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // Volatile variables used from within ISRs
 volatile bool outputEnabled = false;
+volatile int vSetEncoderValue = 0;
+volatile int iSetEncoderValue = 0;
 
 // Flags to handle application status changes
 volatile bool outputEnabledChanged = false;
+volatile bool vSetEncoderChanged = false;
+volatile bool iSetEncoderChanged = false;
 
 /*
- * Interrupt Service Routine for the front-panel output enable toggle button
+ * Interrupt service routine for the front-panel output enable toggle button
  * 
  * resetButtonDepressedCount is a supporting variable for this function only
  */
@@ -65,7 +71,63 @@ void resetButtonISR()
   }
 }
 
+/*
+ * Interrupt service routine for the voltage-set rotary encoder
+ * 
+ * VSETA_last is a supporting variable used in this function only
+ */
+volatile int VSETA_last = HIGH;
+void vSetEncoderISR()
+{
+  int A = digitalRead(VSETA);
+  // if detected rising edge on A
+  if ((VSETA_last == LOW) && (A == HIGH))
+  {
+    // VSETB == low is turning clockwise
+    if (digitalRead(VSETB) == LOW)
+    {
+        vSetEncoderValue += 1;
+    }
+    // Turning counter clockwise
+    else
+    {
+        vSetEncoderValue -= 1;
+    }
 
+    vSetEncoderChanged = true;;
+  }
+
+  VSETA_last = A;
+}
+
+/*
+ * Interrupt service routine for the current limit-set rotary encoder
+ * 
+ * ISETA_last is a supporting variable used in this function only
+ */
+volatile int ISETA_last = HIGH;
+void iSetEncoderISR()
+{
+  int A = digitalRead(ISETA);
+  // if detected rising edge on A
+  if ((ISETA_last == LOW) && (A == HIGH))
+  {
+    // ISETB == low is turning clockwise
+    if (digitalRead(ISETB) == LOW)
+    {
+        iSetEncoderValue += 1;
+    }
+    // Turning counter clockwise
+    else
+    {
+        iSetEncoderValue -= 1;
+    }
+
+    iSetEncoderChanged = true;;
+  }
+
+  ISETA_last = A;
+}
 
 /*
  * Master input service routine handling inputs from rotary encoders and the button
@@ -73,6 +135,8 @@ void resetButtonISR()
 void inputISR()
 {
   resetButtonISR();
+  vSetEncoderISR();
+  iSetEncoderISR();
 }
 
 void setup()
@@ -94,6 +158,8 @@ void setup()
 
   pinMode(VSETA, INPUT);
   pinMode(VSETB, INPUT);
+  pinMode(ISETA, INPUT);
+  pinMode(ISETB, INPUT);
 
   pinMode(SHUTDOWN_LED, OUTPUT);
   pinMode(CURLIM_LED, OUTPUT);
@@ -108,11 +174,33 @@ void setup()
 
 }
 
+void updateLCD()
+{
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print(vSetEncoderValue);
+  
+  lcd.setCursor(0,1);
+  lcd.print(iSetEncoderValue);
+}
+
 void loop()
 {
   if (outputEnabledChanged)
   {
     digitalWrite(SHUTDOWN_LED, !outputEnabled);
     outputEnabledChanged = false;
+  }
+
+  if (vSetEncoderChanged)
+  {
+    updateLCD();
+    vSetEncoderChanged = false;
+  }
+
+  if (iSetEncoderChanged)
+  {
+    updateLCD();
+    iSetEncoderChanged = false;
   }
 }
