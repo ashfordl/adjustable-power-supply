@@ -10,8 +10,9 @@
  */
 
 #include <Wire.h>
-// Requires the LiquidCrystal_I2C library available from the Arduino IDE package manager
 #include <LiquidCrystal_I2C.h>
+#include <TimerOne.h>
+
 
 // Set the LCD address
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -32,11 +33,54 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 // Output enable pin
 #define OUTRESET_BTN 2
 
+// Volatile variables used from within ISRs
+volatile bool outputEnabled = false;
+
+// Flags to handle application status changes
+volatile bool outputEnabledChanged = false;
+
+/*
+ * Interrupt Service Routine for the front-panel output enable toggle button
+ * 
+ * resetButtonDepressedCount is a supporting variable for this function only
+ */
+volatile int resetButtonDepressedCount = 0;
+void resetButtonISR()
+{
+  // Active low due to (external) pull-up resistor R2
+  if (!digitalRead(OUTRESET_BTN))
+  {
+    resetButtonDepressedCount += 1;
+  }
+  else if (resetButtonDepressedCount > 0)
+  {
+    // Software debounce (essentially only polls once every 15ms)
+    if (resetButtonDepressedCount > 3)
+    {
+      outputEnabled = !outputEnabled;
+      outputEnabledChanged = true;
+    }
+    
+    resetButtonDepressedCount = 0;
+  }
+}
+
+
+
+/*
+ * Master input service routine handling inputs from rotary encoders and the button
+ */
+void inputISR()
+{
+  resetButtonISR();
+}
+
 void setup()
 {
   // Init LCD
   lcd.init();
   lcd.backlight();
+
 
   // Set pin modes and initial pin outputs
   pinMode(CSADC, OUTPUT);
@@ -57,22 +101,18 @@ void setup()
   digitalWrite(CURLIM_LED, LOW);
 
   pinMode(OUTRESET_BTN, INPUT_PULLUP);
-  
-  // Print a message to the LCD.
-  lcd.setCursor(0,0);
-  lcd.print("abcdefghijklmnop");
-  lcd.setCursor(0,1);
-  lcd.print("ABCdefghijklmnop");
+
+  // 5000us = 5ms
+  Timer1.initialize(5000);
+  Timer1.attachInterrupt(inputISR);
+
 }
 
 void loop()
 {
-  // Testing the LCD
-  
-  delay(1000);
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("1000");
-  delay(1000);
-  lcd.clear();
+  if (outputEnabledChanged)
+  {
+    digitalWrite(SHUTDOWN_LED, !outputEnabled);
+    outputEnabledChanged = false;
+  }
 }
