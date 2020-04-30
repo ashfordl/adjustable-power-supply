@@ -53,22 +53,22 @@ volatile bool iSetEncoderChanged = false;
 volatile int resetButtonDepressedCount = 0;
 void resetButtonISR()
 {
-  // Active low due to (external) pull-up resistor R2
-  if (!digitalRead(OUTRESET_BTN))
-  {
-    resetButtonDepressedCount += 1;
-  }
-  else if (resetButtonDepressedCount > 0)
-  {
-    // Software debounce (essentially only polls once every 15ms)
-    if (resetButtonDepressedCount > 3)
+    // Active low due to (external) pull-up resistor R2
+    if (!digitalRead(OUTRESET_BTN))
     {
-      outputEnabled = !outputEnabled;
-      outputEnabledChanged = true;
+        resetButtonDepressedCount += 1;
     }
-    
-    resetButtonDepressedCount = 0;
-  }
+    else if (resetButtonDepressedCount > 0)
+    {
+        // Software debounce (essentially only polls once every 15ms)
+        if (resetButtonDepressedCount > 3)
+        {
+            outputEnabled = !outputEnabled;
+            outputEnabledChanged = true;
+        }
+        
+        resetButtonDepressedCount = 0;
+    }
 }
 
 /*
@@ -79,25 +79,25 @@ void resetButtonISR()
 volatile int VSETA_last = HIGH;
 void vSetEncoderISR()
 {
-  int A = digitalRead(VSETA);
-  // if detected rising edge on A
-  if ((VSETA_last == LOW) && (A == HIGH))
-  {
-    // VSETB == low is turning clockwise
-    if (digitalRead(VSETB) == LOW)
+    int A = digitalRead(VSETA);
+    // if detected rising edge on A
+    if ((VSETA_last == LOW) && (A == HIGH))
     {
-        vSetEncoderValue += 1;
-    }
-    // Turning counter clockwise
-    else
-    {
-        vSetEncoderValue -= 1;
+        // VSETB == low is turning clockwise
+        if (digitalRead(VSETB) == LOW)
+        {
+            vSetEncoderValue += 1;
+        }
+        // Turning counter clockwise
+        else
+        {
+            vSetEncoderValue -= 1;
+        }
+
+        vSetEncoderChanged = true;;
     }
 
-    vSetEncoderChanged = true;;
-  }
-
-  VSETA_last = A;
+    VSETA_last = A;
 }
 
 /*
@@ -108,25 +108,25 @@ void vSetEncoderISR()
 volatile int ISETA_last = HIGH;
 void iSetEncoderISR()
 {
-  int A = digitalRead(ISETA);
-  // if detected rising edge on A
-  if ((ISETA_last == LOW) && (A == HIGH))
-  {
-    // ISETB == low is turning clockwise
-    if (digitalRead(ISETB) == LOW)
+    int A = digitalRead(ISETA);
+    // if detected rising edge on A
+    if ((ISETA_last == LOW) && (A == HIGH))
     {
-        iSetEncoderValue += 1;
-    }
-    // Turning counter clockwise
-    else
-    {
-        iSetEncoderValue -= 1;
+        // ISETB == low is turning clockwise
+        if (digitalRead(ISETB) == LOW)
+        {
+            iSetEncoderValue += 1;
+        }
+        // Turning counter clockwise
+        else
+        {
+            iSetEncoderValue -= 1;
+        }
+
+        iSetEncoderChanged = true;;
     }
 
-    iSetEncoderChanged = true;;
-  }
-
-  ISETA_last = A;
+    ISETA_last = A;
 }
 
 /*
@@ -134,73 +134,73 @@ void iSetEncoderISR()
  */
 void inputISR()
 {
-  resetButtonISR();
-  vSetEncoderISR();
-  iSetEncoderISR();
+    resetButtonISR();
+    vSetEncoderISR();
+    iSetEncoderISR();
 }
 
 void setup()
 {
-  // Init LCD
-  lcd.init();
-  lcd.backlight();
+    // Init LCD
+    lcd.init();
+    lcd.backlight();
 
 
-  // Set pin modes and initial pin outputs
-  pinMode(CSADC, OUTPUT);
-  pinMode(CSDAC, OUTPUT);
-  pinMode(ENABLE2675, OUTPUT);
+    // Set pin modes and initial pin outputs
+    pinMode(CSADC, OUTPUT);
+    pinMode(CSDAC, OUTPUT);
+    pinMode(ENABLE2675, OUTPUT);
 
-  digitalWrite(CSADC, HIGH);
-  digitalWrite(CSDAC, HIGH);
-  // Begin with the LM2675 disabled
-  digitalWrite(ENABLE2675, LOW);
+    digitalWrite(CSADC, HIGH);
+    digitalWrite(CSDAC, HIGH);
+    // Begin with the LM2675 disabled
+    digitalWrite(ENABLE2675, LOW);
 
-  pinMode(VSETA, INPUT);
-  pinMode(VSETB, INPUT);
-  pinMode(ISETA, INPUT);
-  pinMode(ISETB, INPUT);
+    pinMode(VSETA, INPUT);
+    pinMode(VSETB, INPUT);
+    pinMode(ISETA, INPUT);
+    pinMode(ISETB, INPUT);
 
-  pinMode(SHUTDOWN_LED, OUTPUT);
-  pinMode(CURLIM_LED, OUTPUT);
-  digitalWrite(SHUTDOWN_LED, HIGH);
-  digitalWrite(CURLIM_LED, LOW);
+    pinMode(SHUTDOWN_LED, OUTPUT);
+    pinMode(CURLIM_LED, OUTPUT);
+    digitalWrite(SHUTDOWN_LED, HIGH);
+    digitalWrite(CURLIM_LED, LOW);
 
-  pinMode(OUTRESET_BTN, INPUT_PULLUP);
+    pinMode(OUTRESET_BTN, INPUT_PULLUP);
 
-  // 5000us = 5ms
-  Timer1.initialize(5000);
-  Timer1.attachInterrupt(inputISR);
+    // 5000us = 5ms
+    Timer1.initialize(5000);
+    Timer1.attachInterrupt(inputISR);
 
 }
 
 void updateLCD()
 {
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print(vSetEncoderValue);
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print(vSetEncoderValue);
   
-  lcd.setCursor(0,1);
-  lcd.print(iSetEncoderValue);
+    lcd.setCursor(0,1);
+    lcd.print(iSetEncoderValue);
 }
 
 void loop()
 {
-  if (outputEnabledChanged)
-  {
-    digitalWrite(SHUTDOWN_LED, !outputEnabled);
-    outputEnabledChanged = false;
-  }
+    if (outputEnabledChanged)
+    {
+        digitalWrite(SHUTDOWN_LED, !outputEnabled);
+        outputEnabledChanged = false;
+    }
 
-  if (vSetEncoderChanged)
-  {
-    updateLCD();
-    vSetEncoderChanged = false;
-  }
+    if (vSetEncoderChanged)
+    {
+        updateLCD();
+        vSetEncoderChanged = false;
+    }
 
-  if (iSetEncoderChanged)
-  {
-    updateLCD();
-    iSetEncoderChanged = false;
-  }
+    if (iSetEncoderChanged)
+    {
+        updateLCD();
+        iSetEncoderChanged = false;
+    }
 }
