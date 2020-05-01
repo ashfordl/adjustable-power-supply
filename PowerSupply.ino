@@ -12,7 +12,7 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <TimerOne.h>
-
+#include <SPI.h>
 
 // Set the LCD address
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -139,18 +139,53 @@ void inputISR()
     iSetEncoderISR();
 }
 
+/*
+ * Writes the specified value to the DAC
+ *
+ * This design uses the MCP4822 DAC
+ * VOUTA goes to the switching regulator LM2675/U1
+ * VOUTB goes to the linear regulator LM317/U5 through opamp LMC6482/U4B
+ *
+ * INPUTS
+ * channel - 0 or 1 corresponding to the DAC channel (0 = VOUTA, 1 = VOUTB)
+ * gainEnable - true or false corresponding to whether to enable the optional 2x hardware gain
+ * channelEnable - true or false corresponding to whether to enable this output channel
+ * value - int from 0 to 4095 correspondin to the value to be written to the DAC
+ */
+void writeDac(int channel, boolean gainEnable, bool channelEnable, int value)
+{
+    byte b = 0;
+    // Channel select (0 = output A, 1 = output B)
+    b |= ((boolean)(channel)) << 7;
+    // Output gain select (0 = 2x gain, 1 = 1x gain)
+    b |= (!gainEnable) << 5;
+    // Output shutdown control bit (0 = output disabled, 1 = output enabled)
+    b |= (channelEnable) << 4;
+    // 12-bit value, MSB first
+    b |= ((value & 4095) >> 8);
+
+    // Enable SPI communcation
+    digitalWrite(CSDAC, LOW);
+    // Transfer first byte
+    SPI.transfer(b);
+    // Transfer 8 LSB of value
+    SPI.transfer((byte)(value & 255));
+    // Disable SPI communication
+    digitalWrite(CSDAC, HIGH);
+}
+
 void setup()
 {
     // Init LCD
     lcd.init();
     lcd.backlight();
 
-
     // Set pin modes and initial pin outputs
     pinMode(CSADC, OUTPUT);
     pinMode(CSDAC, OUTPUT);
     pinMode(ENABLE2675, OUTPUT);
 
+    // Disable SPI chips
     digitalWrite(CSADC, HIGH);
     digitalWrite(CSDAC, HIGH);
     // Begin with the LM2675 disabled
@@ -168,10 +203,21 @@ void setup()
 
     pinMode(OUTRESET_BTN, INPUT_PULLUP);
 
+    // Init SPI
+    SPI.setClockDivider(SPI_CLOCK_DIV4); // slow the SPI bus down
+    SPI.setBitOrder(MSBFIRST);  // Most significant bit arrives first
+    SPI.setDataMode(SPI_MODE0);    // SPI 0,0 as per MCP4821/2 data sheet
+    SPI.begin();
+
     // 5000us = 5ms
     Timer1.initialize(5000);
     Timer1.attachInterrupt(inputISR);
 
+    // TEST
+    // Write 1V to output A of DAC
+    writeDac(0, true, true, 1000);
+    // Write 3.3V to output A of DAC
+    writeDac(1, true, true, 3300);
 }
 
 void updateLCD()
