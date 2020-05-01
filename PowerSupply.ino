@@ -4,9 +4,9 @@
  * 
  * Written for Atmel ATmega328 running Arduino bootloader
  * 
- * Library dependencies:
- * LiquidCrystal_I2C (Arduino Package Manager)
- * 
+ * Library dependencies (source):
+ * LiquidCrystal_I2C v1.1.2 (Arduino IDE Library Manager)
+ * TimerOne v1.1.0  (Arduino IDE Library Manager)
  */
 
 #include <Wire.h>
@@ -174,6 +174,73 @@ void writeDac(int channel, boolean gainEnable, bool channelEnable, int value)
     digitalWrite(CSDAC, HIGH);
 }
 
+/*
+ * Reads the current value on the specified ADC channel
+ *
+ * This design uses an MCP3204 with external 4.096V reference
+ *
+ * INPUTS
+ * channel - 0, 1, 2, 3 corresponding to the equivalent channel on the ADC
+ *
+ * OUTPUT
+ * int value between 0 and 4095, the ADC's reading in millivolts 0 - 4.095V
+ */
+int readAdc(int channel)
+{
+    byte b0 = 0;
+    // Start bit
+    b0 |= 1 << 2;
+    // Single-ended readings not pseudo-differential pairs
+    b0 |= 1 << 1;
+
+    byte b1 = 0;
+    /* 
+     * b1 looks like
+     * ab000000
+     * where ab is the binary number corresponding to the channel to read
+     * (cf communication protocol detailed below)
+     */
+    b1 |= channel << 6;
+
+    /* 
+     * Communication protocol (MCP3204):
+     *
+     *      |---------------b0--------------|---------------------b1--------------------|
+     * Bit# | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |  7   |  6   | 5 | 4 |  3  |  2  | 1  | 0  |
+     * SEND | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 0 | b1_7 | b1_6 | 0 | 0 |  0  |  0  | 0  | 0  |
+     * READ | x | x | x | x | x | x | x | x |  x   |  x   | x | x | B11 | B10 | B9 | B8 |
+     * 
+     *      |-------------------b2------------------|
+     * Bit# | 7  | 6  | 5  | 4  | 3  | 2  | 1  | 0  |
+     * SEND | 0  | 0  | 0  | 0  | 0  | 0  | 0  | 0  |
+     * READ | B7 | B6 | B5 | B4 | B3 | B2 | B1 | B0 |
+     *
+     * Bit#2 of b0 is the start bit
+     * Bit#1 of b0 selects single-ended readings not differential pairs
+     * Bit#7-6 of b1 select the channel
+     * Bit#5 of b1 is when the ADC samples
+     * Bit#4 of b1 is the null bit specified in the datasheet
+     * B11-0 are the output bits, transmitted MSB first
+     */
+
+
+    int output = 0;
+
+    // Enable SPI communication
+    digitalWrite(CSADC, LOW);
+    // Transfer first byte
+    SPI.transfer(b0);
+    // Transfer second byte to select channel, then read output and shift appropriately
+    output = SPI.transfer(b1) << 8;
+    // Read remainder of output
+    output |= SPI.transfer(0);
+    // Disable SPI communication
+    digitalWrite(CSADC, HIGH);
+
+    // AND with 4095 to kill any output from the null bit
+    return output & 4095;
+}
+
 void setup()
 {
     // Init LCD
@@ -240,13 +307,24 @@ void loop()
 
     if (vSetEncoderChanged)
     {
-        updateLCD();
+        // updateLCD();
         vSetEncoderChanged = false;
     }
 
     if (iSetEncoderChanged)
     {
-        updateLCD();
+        // updateLCD();
         iSetEncoderChanged = false;
     }
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    // Read from ADC_IN1 = ADC's channel 0
+    lcd.print(readAdc(0));
+    lcd.setCursor(0, 1);
+    // Read from ADC_IN2 = ADC's channel 1
+    lcd.print(readAdc(1));
+
+
+    delay(1000);
 }
