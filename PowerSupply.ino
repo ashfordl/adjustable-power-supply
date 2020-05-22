@@ -315,8 +315,7 @@ int calculateDAC2Output(int target)
  */
 int calculateADC2Input()
 {
-    int adc_voltage = readAdc(1);
-    return (int)(adc_voltage * 2.65f);
+    return (int)(readAdc(1) * 2.65f);
 }
 
 void setup()
