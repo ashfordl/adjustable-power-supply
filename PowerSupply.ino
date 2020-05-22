@@ -275,7 +275,7 @@ int readAdc(int channel)
  * INPUTS
  * target - integer quantity of millivolts to aim for at the terminals
  *
- * OUTPUTS
+ * OUTPUT
  * int value to write to DAC1 to obtain the target output at the terminals
  */
 int calculateDAC1Output(int target)
@@ -296,12 +296,27 @@ int calculateDAC1Output(int target)
  * INPUTS
  * target - integer quantity of millivolts to aim for at the terminals
  *
- * OUTPUTS
+ * OUTPUT
  * int value to write to DAC2 to obtain the target output at the terminals
  */
 int calculateDAC2Output(int target)
 {
     return (int)((float)(target - 1250) / 2.21f);
+}
+
+/*
+ * Returns the actual millivolt output at the terminals
+ *
+ * Reads the value of ADC_IN2 (in hardware) / ADC channel 1 (software) and adjusts to 
+ * compensate for the resistor divider R34 & R35
+ *
+ * OUTPUT
+ * int value corresponding to the actual millivolt output at the terminals
+ */
+int calculateADC2Input()
+{
+    int adc_voltage = readAdc(1);
+    return (int)(adc_voltage * 2.65f);
 }
 
 void setup()
@@ -387,7 +402,7 @@ void loop()
     lcd.print(readAdc(0));
     lcd.setCursor(0, 1);
     // Read from ADC_IN2 = ADC's channel 1
-    lcd.print(readAdc(1));
+    lcd.print(calculateADC2Input());
 
 
     delay(1000);
