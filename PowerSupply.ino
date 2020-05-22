@@ -241,6 +241,69 @@ int readAdc(int channel)
     return output & 4095;
 }
 
+/*
+ * Calculates and returns the required output on DAC1 to give the actual target
+ * output at the terminals
+ *
+ * FORMULA
+ * 4530 - ((target output) * 0.437)
+ * This is hardcoded so as to repeat calculations in the MCU. See derivation below.
+ *
+ * DERIVATION
+ * R3 = 1000 ohms
+ * R5 = 3480 ohms
+ * R7 = 7970 ohms
+ *
+ * We otherwise work below in millivolts and milliamps
+ *
+ * V_{FB} = 1210 mV
+ *
+ * The LM2675 tries to hold pin 4 (FEEDBACK) at 1210 mV, we use Kirchhoff's Current Law
+ * at this pin
+ * I_{R3} = 1.21 mA
+ * I_{R7} = (LM2675 Output - V_{FB}) / R7 mA
+ * I_{R5} = (V_{DAC1} - V_{FB}) / R5 mA
+ *
+ * To allow for the linear regulator and current sense resistor network, we aim for LM2675
+ * output to be target output + 3250 mV
+ *
+ * KCL  => I_{R5} = I_{R3} - I_{R7}
+ *      => V_{DAC} - 1210 = 3480 * ( 1.21 - output/7970 + 1210/7970 )
+ * To a good approximation, rounding appropriately, we have that
+ * V_{DAC} = 4530 - (target output * 0.437)
+ *
+ * INPUTS
+ * target - integer quantity of millivolts to aim for at the terminals
+ *
+ * OUTPUTS
+ * int value to write to DAC1 to obtain the target output at the terminals
+ */
+int calculateDAC1Output(int target)
+{
+    return 4530 - (int)(target * (0.437f));
+}
+
+/*
+ * Calculates and returns the required output on DAC2 to give the actual target
+ * output at the terminals
+ *
+ * FORMULA
+ * ((target output) - (linear dropout)) / (opamp gain U4B)
+ *
+ * The LM317 voltage reference is 1.25V and the op-amp gain is 1 + 100/82 = 2.21 (measured
+ * in circuit)
+ * 
+ * INPUTS
+ * target - integer quantity of millivolts to aim for at the terminals
+ *
+ * OUTPUTS
+ * int value to write to DAC2 to obtain the target output at the terminals
+ */
+int calculateDAC2Output(int target)
+{
+    return (int)((float)(target - 1250) / 2.21f);
+}
+
 void setup()
 {
     // Init LCD
@@ -282,9 +345,10 @@ void setup()
 
     // TEST
     // Write 1V to output A of DAC
-    writeDac(0, true, true, 1000);
+    digitalWrite(ENABLE2675, HIGH);
+    writeDac(0, true, true, calculateDAC1Output(7500));
     // Write 3.3V to output A of DAC
-    writeDac(1, true, true, 3300);
+    writeDac(1, true, true, calculateDAC2Output(7500));
 }
 
 void updateLCD()
